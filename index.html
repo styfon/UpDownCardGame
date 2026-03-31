@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Scorecard Pro</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card-bg: #1e293b;
+        --text: #f8fafc;
+        --accent: #6366f1;
+        --danger: #ef4444;
+        --border: #334155;
+        --success: #22c55e;
+        --muted: #94a3b8;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .container {
+        width: 100%;
+        max-width: 800px;
+      }
+
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+        padding: 0 5px;
+      }
+
+      h1 {
+        font-size: 1.1rem;
+        margin: 0;
+        color: var(--accent);
+      }
+
+      .btn-group {
+        display: flex;
+        gap: 5px;
+      }
+
+      button {
+        border: 1px solid var(--border);
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.75rem;
+        color: white;
+        background: transparent;
+      }
+
+      button.setup {
+        border-color: var(--success);
+        color: var(--success);
+      }
+      button.rules {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button.reset {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      #settingsPanel {
+        display: none;
+        background: #111827;
+        border: 1px solid var(--accent);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        font-size: 0.85rem;
+      }
+
+      .setting-row {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 12px;
+      }
+      .setting-row label {
+        font-size: 0.7rem;
+        color: var(--muted);
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05rem;
+      }
+      .setting-row input {
+        width: 100% !important;
+        height: 35px !important;
+        text-align: left !important;
+        padding-left: 10px !important;
+        font-family: monospace;
+        font-size: 0.85rem !important;
+      }
+
+      .table-wrapper {
+        overflow-x: auto;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--card-bg);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.8rem;
+      }
+      th,
+      td {
+        padding: 6px 2px;
+        text-align: center;
+        border-bottom: 1px solid var(--border);
+      }
+      th {
+        background: #1e293b;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+      .sticky-col {
+        position: sticky;
+        left: 0;
+        background: #2d3748;
+        z-index: 5;
+        font-weight: bold;
+        width: 30px;
+      }
+
+      .cell-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+      .score-inputs {
+        display: flex;
+        gap: 3px;
+      }
+      .running-total {
+        font-size: 0.7rem;
+        color: var(--muted);
+        font-weight: 600;
+        min-height: 14px;
+      }
+
+      input {
+        width: 32px;
+        height: 32px;
+        background: #334155;
+        border: 1px solid #475569;
+        color: white;
+        text-align: center;
+        border-radius: 6px;
+        font-size: 0.9rem;
+      }
+      input:focus {
+        outline: 2px solid var(--accent);
+      }
+      tr.total-row {
+        background: #111827;
+        font-weight: bold;
+        font-size: 1rem;
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>Scorecard Pro</h1>
+        <div class="btn-group">
+          <button class="rules" onclick="toggleSettings()">Rules</button>
+          <button class="setup" onclick="setupNewGame()">New</button>
+          <button class="reset" onclick="resetScores()">Clear</button>
+        </div>
+      </header>
+
+      <div id="settingsPanel">
+        <div
+          style="font-weight: bold; margin-bottom: 10px; color: var(--accent)"
+        >
+          Formula Engine
+        </div>
+
+        <div class="setting-row">
+          <label>If Bid Matches (Success)</label>
+          <input
+            type="text"
+            id="successFormula"
+            value="10 + (2 * T)"
+            oninput="updateRules()"
+          />
+        </div>
+
+        <div class="setting-row">
+          <label>If Bid Misses (Failure)</label>
+          <input
+            type="text"
+            id="failureFormula"
+            value="10 - (3 * Math.abs(B - T))"
+            oninput="updateRules()"
+          />
+        </div>
+
+        <p style="font-size: 0.7rem; color: var(--muted); margin: 0">
+          Use <b>B</b> for Bid and <b>T</b> for Tricks. <br />
+          <i>Example: Math.abs(B - T) gives the absolute difference.</i>
+        </p>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="mainTable">
+          <thead>
+            <tr id="headerRow"></tr>
+          </thead>
+          <tbody id="gameBody"></tbody>
+          <tfoot>
+            <tr class="total-row" id="footerRow"></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <script>
+      let players = JSON.parse(localStorage.getItem("players")) || [
+        "Sam",
+        "Jen",
+        "Ste",
+        "Oll",
+        "Ann",
+      ];
+      let rules = JSON.parse(localStorage.getItem("rules")) || {
+        success: "10 + (2 * T)",
+        failure: "10 - (3 * Math.abs(B - T))",
+      };
+      const rounds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+
+      function toggleSettings() {
+        const panel = document.getElementById("settingsPanel");
+        panel.style.display =
+          panel.style.display === "block" ? "none" : "block";
+      }
+
+      function updateRules() {
+        rules.success = document.getElementById("successFormula").value;
+        rules.failure = document.getElementById("failureFormula").value;
+        localStorage.setItem("rules", JSON.stringify(rules));
+        calculate();
+      }
+
+      function initTable() {
+        document.getElementById("successFormula").value = rules.success;
+        document.getElementById("failureFormula").value = rules.failure;
+
+        const headerRow = document.getElementById("headerRow");
+        const footerRow = document.getElementById("footerRow");
+        const gameBody = document.getElementById("gameBody");
+
+        headerRow.innerHTML = '<th class="sticky-col">R</th>';
+        footerRow.innerHTML = '<td class="sticky-col">Σ</td>';
+        gameBody.innerHTML = "";
+
+        players.forEach((p) => {
+          headerRow.innerHTML += `<th>${p}<br><span style="font-size:0.5rem; opacity:0.6">B | T</span></th>`;
+          footerRow.innerHTML += `<td id="total-${p}">0</td>`;
+        });
+
+        rounds.forEach((r, idx) => {
+          let row = `<tr><td class="sticky-col">${r}</td>`;
+          players.forEach((p) => {
+            row += `<td>
+                    <div class="cell-container">
+                        <div class="score-inputs">
+                            <input type="number" inputmode="numeric" class="bid" data-p="${p}" data-r="${idx}" oninput="calculate()">
+                            <input type="number" inputmode="numeric" class="trk" data-p="${p}" data-r="${idx}" oninput="calculate()">
+                        </div>
+                        <div class="running-total" id="rt-${p}-${idx}"></div>
+                    </div>
+                </td>`;
+          });
+          row += `</tr>`;
+          gameBody.innerHTML += row;
+        });
+        loadScores();
+      }
+
+      function calculate() {
+        let currentTotals = {};
+        let scoreData = {};
+        players.forEach((p) => (currentTotals[p] = 0));
+
+        // Pre-compile the functions for performance
+        let successFn, failureFn;
+        try {
+          successFn = new Function("B", "T", `return ${rules.success}`);
+          failureFn = new Function("B", "T", `return ${rules.failure}`);
+        } catch (e) {
+          console.error("Formula Error", e);
+          return; // Exit if formula is invalid
+        }
+
+        for (let rIdx = 0; rIdx < rounds.length; rIdx++) {
+          players.forEach((p) => {
+            const bInput = document.querySelector(
+              `.bid[data-p="${p}"][data-r="${rIdx}"]`,
+            );
+            const tInput = document.querySelector(
+              `.trk[data-p="${p}"][data-r="${rIdx}"]`,
+            );
+            const rtDisplay = document.getElementById(`rt-${p}-${rIdx}`);
+
+            if (bInput.value !== "" && tInput.value !== "") {
+              const B = parseInt(bInput.value);
+              const T = parseInt(tInput.value);
+
+              try {
+                let roundScore = B === T ? successFn(B, T) : failureFn(B, T);
+                currentTotals[p] += roundScore;
+                rtDisplay.innerText = currentTotals[p];
+              } catch (e) {
+                rtDisplay.innerText = "Err";
+              }
+            } else {
+              rtDisplay.innerText = "";
+            }
+            scoreData[`${p}-${rIdx}-b`] = bInput.value;
+            scoreData[`${p}-${rIdx}-t`] = tInput.value;
+          });
+        }
+        players.forEach(
+          (p) =>
+            (document.getElementById(`total-${p}`).innerText =
+              currentTotals[p]),
+        );
+        localStorage.setItem("cardGameScores", JSON.stringify(scoreData));
+      }
+
+      function setupNewGame() {
+        const count = prompt("How many players?", players.length);
+        if (!count) return;
+        let newPlayers = [];
+        for (let i = 0; i < parseInt(count); i++) {
+          const name = prompt(
+            `Enter name for Player ${i + 1}:`,
+            players[i] || `P${i + 1}`,
+          );
+          newPlayers.push(name || `P${i + 1}`);
+        }
+        if (confirm("Clear scores and start new game?")) {
+          players = newPlayers;
+          localStorage.setItem("players", JSON.stringify(players));
+          localStorage.removeItem("cardGameScores");
+          initTable();
+        }
+      }
+
+      function loadScores() {
+        const scoreData = JSON.parse(localStorage.getItem("cardGameScores"));
+        if (!scoreData) return;
+        Object.keys(scoreData).forEach((key) => {
+          const [p, r, type] = key.split("-");
+          const selector = type === "b" ? ".bid" : ".trk";
+          const input = document.querySelector(
+            `${selector}[data-p="${p}"][data-r="${r}"]`,
+          );
+          if (input) input.value = scoreData[key];
+        });
+        calculate();
+      }
+
+      function resetScores() {
+        if (confirm("Clear current scores?")) {
+          localStorage.removeItem("cardGameScores");
+          document.querySelectorAll("input").forEach((i) => (i.value = ""));
+          calculate();
+        }
+      }
+
+      window.onload = initTable;
+    </script>
+  </body>
+</html>
